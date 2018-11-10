@@ -1,7 +1,7 @@
 $cred = [pscredential]::new('ben', (ConvertTo-SecureString -String '' -AsPlainText -Force))
 $null = New-DSCPullServerAdminConnection -SQLServer '' -Credential $cred -Database dsc
 $configDirectory = 'C:\Users\BenGelens\Desktop\bla'
-$moduleDirectory = 'C:\Users\BenGelens\Desktop\bla'
+$moduleDirectory = 'C:\Users\BenGelens\Desktop\modules'
 
 New-PolarisPutRoute -Path 'Nodes:ID' -Scriptblock {
     $script:Polaris.Log(($Request.Body | ConvertTo-Json -Depth 100))
@@ -70,6 +70,7 @@ New-PolarisGetRoute -Path 'Nodes:ID/Configurations:ConfigName/ConfigurationConte
     $Response.Headers.Add('ProtocolVersion', '2.0')
 
     $file = Get-Item -Path $configDirectory\$configName.mof -ErrorAction SilentlyContinue
+    $script:Polaris.Log($file)
     if ($null -eq $file) {
         $Response.StatusCode = 404
     } else {
@@ -79,7 +80,37 @@ New-PolarisGetRoute -Path 'Nodes:ID/Configurations:ConfigName/ConfigurationConte
         $fileBytes = [io.file]::ReadAllBytes($file)
 
         $Response.StatusCode = 200
-        $Response.ContentType = 'application/json'
+        $Response.ContentType = 'application/octet-stream'
+        $Response.Headers.Add('Content-Length', $content.Length)
+        $Response.Headers.Add('Checksum', $checkSum)
+        $Response.Headers.Add('ChecksumAlgorithm','SHA-256')
+        $Response.ByteResponse = $fileBytes
+    }
+}
+
+New-PolarisGetRoute -Path 'Modules:ModuleName,:ModuleVersion/ModuleContent' -Scriptblock {
+    $script:Polaris.Log(($Request.Body | ConvertTo-Json -Depth 100))
+    $script:Polaris.Log(($Request.Headers | ConvertTo-Json -Depth 100))
+    $script:Polaris.Log(($Request.Parameters | ConvertTo-Json -Depth 100))
+
+    $moduleName = ($Request.Parameters.ModuleName -split '=')[-1].TrimEnd(')').Trim("'")
+    $moduleVersion = ($Request.Parameters.ModuleVersion -split '=')[-1].TrimEnd(')').Trim("'")
+
+    $Response.Headers.Add('ProtocolVersion', '2.0')
+    $moduleFullName = $moduleName + '_' + $moduleVersion + '.zip'
+
+    $file = Get-Item -Path $moduleDirectory\$moduleFullName -ErrorAction SilentlyContinue
+    $script:Polaris.Log($file)
+    if ($null -eq $file) {
+        $Response.StatusCode = 404
+    } else {
+        $content = $file | Get-Content -Encoding unicode
+        $checksum = ($file | Get-FileHash -Algorithm SHA256).Hash
+
+        $fileBytes = [io.file]::ReadAllBytes($file)
+
+        $Response.StatusCode = 200
+        $Response.ContentType = 'application/octet-stream'
         $Response.Headers.Add('Content-Length', $content.Length)
         $Response.Headers.Add('Checksum', $checkSum)
         $Response.Headers.Add('ChecksumAlgorithm','SHA-256')
