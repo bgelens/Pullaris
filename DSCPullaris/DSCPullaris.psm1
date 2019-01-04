@@ -3,6 +3,7 @@ $session = New-DSCPullServerAdminConnection -SQLServer 'dscpull' -Credential $cr
 
 $configDirectory = 'C:\Users\Administrator\pullaris\Configurations'
 $moduleDirectory = 'C:\Users\Administrator\pullaris\Modules'
+$authorizationKeys = '00000000-0000-0000-0000-000000000000'
 
 function Test-DSCCLientHeader {
     param (
@@ -13,6 +14,42 @@ function Test-DSCCLientHeader {
     } else {
         $true
     }
+}
+
+function Test-DSCClientRegistrationKey {
+    param (
+        $Request
+    )
+
+    $xmsdate = $Request.Headers['x-ms-date']
+    $auth = $Request.Headers['Authorization'] -replace 'Shared '
+
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+
+    $digB64 = [System.Convert]::ToBase64String(
+        $sha.ComputeHash(
+            [System.Text.Encoding]::UTF8.GetBytes($Request.BodyString)
+        )
+    )
+
+    $sigString = "{0}`n{1}" -f $digB64, $xmsdate
+
+    foreach ($key in $authorizationKeys) {
+        $mac = [System.Security.Cryptography.HMACSHA256]::new(
+            [System.Text.Encoding]::UTF8.GetBytes($key)
+        )
+
+        $sigB64 = [Convert]::ToBase64String(
+            $mac.ComputeHash(
+                [System.Text.Encoding]::UTF8.GetBytes($sigString)
+            )
+        )
+
+        if ($sigB64 -eq $auth) {
+            return $true
+        }
+    }
+    $false
 }
 
 function Set-DSCServerHeader {
@@ -39,6 +76,9 @@ New-PolarisPutRoute -Path "/api/Nodes\(AgentId=':ID'\)" -Scriptblock {
     if (-not (Test-DSCCLientHeader -Request $Request)) {
         Set-DSCServerHeader -Response $Response -StatusCode 400
         $Response.Send('Client protocol version is invalid.')
+    } elseif (-not (Test-DSCClientRegistrationKey -Request $Request)) {
+        Set-DSCServerHeader -Response $Response -StatusCode 400
+        $Response.Send('Unauthorized!')
     } else {
         $existingNode = Get-DSCPullServerAdminRegistration -AgentId $agentId -Connection $session
         if ($null -eq $existingNode) {
