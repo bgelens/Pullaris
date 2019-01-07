@@ -9,11 +9,7 @@ function Test-DSCCLientHeader {
     param (
         $Request
     )
-    if ($Request.Headers['ProtocolVersion'] -ne '2.0') {
-        $false
-    } else {
-        $true
-    }
+    $Request.Headers['ProtocolVersion'] -eq '2.0'
 }
 
 function Test-DSCClientRegistrationKey {
@@ -70,6 +66,14 @@ function Set-DSCServerHeader {
     }
 }
 
+function Test-DSCClientValid {
+    param (
+        $AgentId,
+        $Session
+    )
+    $null -ne (Get-DSCPullServerAdminRegistration -AgentId $AgentId -Connection $Session)
+}
+
 New-PolarisPutRoute -Path "/api/Nodes\(AgentId=':ID'\)" -Scriptblock {
     $agentId = $Request.Parameters.ID
 
@@ -114,16 +118,19 @@ New-PolarisPutRoute -Path "/api/Nodes\(AgentId=':ID'\)" -Scriptblock {
             $existingNode | Set-DSCPullServerAdminRegistration @updateArgs
         }
         Set-DSCServerHeader -Response $Response -StatusCode 204
+        $Response.Send($null)
     }
 }
 
 New-PolarisPostRoute -Path "/api/Nodes\(AgentId=':ID'\)/GetDscAction" -Scriptblock {
-    # TODO: Validate if agent is registered
     $agentId = $Request.Parameters.ID
 
     if (-not (Test-DSCCLientHeader -Request $Request)) {
         Set-DSCServerHeader -Response $Response -StatusCode 400
         $Response.Send('Client protocol version is invalid.')
+    } elseif (-not (Test-DSCClientValid -AgentId $agentId -Session $session)) {
+        Set-DSCServerHeader -Response $Response -StatusCode 404
+        $Response.Send('Unauthorized Client!')
     } else {
         $existingNode = Get-DSCPullServerAdminRegistration -AgentId $agentId -Connection $session
 
@@ -172,13 +179,15 @@ New-PolarisPostRoute -Path "/api/Nodes\(AgentId=':ID'\)/GetDscAction" -Scriptblo
 }
 
 New-PolarisGetRoute -Path "/api/Nodes\(AgentId=':ID'\)/Configurations\(ConfigurationName=':ConfigName'\)/ConfigurationContent" -Scriptblock {
-    # TODO: Validate if agent is registered
     $agentId = $Request.Parameters.ID
     $configName = $Request.Parameters.ConfigName
 
     if (-not (Test-DSCCLientHeader -Request $Request)) {
         Set-DSCServerHeader -Response $Response -StatusCode 400
         $Response.Send('Client protocol version is invalid.')
+    } elseif (-not (Test-DSCClientValid -AgentId $agentId -Session $session)) {
+        Set-DSCServerHeader -Response $Response -StatusCode 404
+        $Response.Send('Unauthorized Client!')
     } else {
         $filePath = (Join-Path -Path $configDirectory -ChildPath $configName) + '.mof'
         $file = Get-Item -Path $filePath -ErrorAction SilentlyContinue
@@ -204,7 +213,6 @@ New-PolarisGetRoute -Path "/api/Nodes\(AgentId=':ID'\)/Configurations\(Configura
 }
 
 New-PolarisGetRoute -Path "/api/Modules\(ModuleName=':ModuleName',ModuleVersion=':ModuleVersion'\)/ModuleContent" -Scriptblock {
-    # TODO: Validate if agent is registered
     $agentId = $Request.Headers['AgentId']
     $moduleName = $Request.Parameters.ModuleName
     $moduleVersion = $Request.Parameters.ModuleVersion
@@ -212,6 +220,9 @@ New-PolarisGetRoute -Path "/api/Modules\(ModuleName=':ModuleName',ModuleVersion=
     if (-not (Test-DSCCLientHeader -Request $Request)) {
         Set-DSCServerHeader -Response $Response -StatusCode 400
         $Response.Send('Client protocol version is invalid.')
+    } elseif (-not (Test-DSCClientValid -AgentId $agentId -Session $session)) {
+        Set-DSCServerHeader -Response $Response -StatusCode 404
+        $Response.Send('Unauthorized Client!')
     } else {
         $moduleFullName = $moduleName + '_' + $moduleVersion + '.zip'
         $filePath = Join-Path -Path $moduleDirectory -ChildPath $moduleFullName
@@ -238,13 +249,15 @@ New-PolarisGetRoute -Path "/api/Modules\(ModuleName=':ModuleName',ModuleVersion=
 }
 
 New-PolarisPostRoute -Path "/api/Nodes\(AgentId=':ID'\)/SendReport" -Scriptblock {
-    # TODO: Validate if agent is registered
     $agentId = $Request.Parameters.ID
     $jobId = $Request.Body.JobId
 
     if (-not (Test-DSCCLientHeader -Request $Request)) {
         Set-DSCServerHeader -Response $Response -StatusCode 400
         $Response.Send('Client protocol version is invalid.')
+    } elseif (-not (Test-DSCClientValid -AgentId $agentId -Session $session)) {
+        Set-DSCServerHeader -Response $Response -StatusCode 404
+        $Response.Send('Unauthorized Client!')
     } else {
         $reportArgs = @{}
         $Request.Body.psobject.properties.ForEach{ $reportArgs[$_.Name] = $_.Value }
