@@ -54,7 +54,7 @@
     RequiredModules = @(
         @{
             ModuleName = 'DSCPullServerAdmin'
-            ModuleVersion = '0.4.2'
+            ModuleVersion = '0.4.3'
         },
         @{
             ModuleName = 'Polaris'

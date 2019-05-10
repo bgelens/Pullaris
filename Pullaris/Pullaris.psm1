@@ -1,4 +1,4 @@
-#requires -modules @{ModuleName = 'DSCPullServerAdmin'; ModuleVersion = '0.4.2'}, Polaris
+#requires -modules @{ModuleName = 'DSCPullServerAdmin'; ModuleVersion = '0.4.3'}, Polaris
 #requires -modules @{ModuleName = 'Polaris'; ModuleVersion = '0.2.0'}
 #requires -version 5.1
 using module DSCPullServerAdmin
@@ -90,7 +90,7 @@ $registrationRoute = {
         $pullaris.SetHeader($Response, 404, $null)
         $Response.Send('Unauthorized!')
     } else {
-        $existingNode = Get-DSCPullServerAdminRegistration -AgentId $agentId -Connection $script:dbSession
+        $existingNode = Get-DSCPullServerAdminRegistration -AgentId $agentId -Connection $pullaris.Connection
         if ($null -eq $existingNode) {
             $newArgs = @{
                 AgentId = $AgentId
@@ -98,7 +98,7 @@ $registrationRoute = {
                 NodeName = $Request.Body.AgentInformation.NodeName
                 IPAddress = $Request.Body.AgentInformation.IPAddress -split ';' -split ',' | Where-Object -FilterScript {$_ -ne [string]::Empty}
                 Confirm = $false
-                Connection = $script:dbSession
+                Connection = $pullaris.Connection
             }
 
             # ReportServer registration does not contain ConfigurationNames
@@ -113,7 +113,7 @@ $registrationRoute = {
                 NodeName = $Request.Body.AgentInformation.NodeName
                 IPAddress = $Request.Body.AgentInformation.IPAddress -split ';' -split ',' | Where-Object -FilterScript {$_ -ne [string]::Empty}
                 Confirm = $false
-                Connection = $script:dbSession
+                Connection = $pullaris.Connection
             }
 
             # ReportServer registration does not contain ConfigurationNames
