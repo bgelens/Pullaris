@@ -141,7 +141,7 @@ $actionRoute = {
         $existingNode = Get-DSCPullServerAdminRegistration -AgentId $agentId -Connection $pullaris.Connection
     
         # always respect ConfigurationName in Database? What about partial configs?
-        $filePath = (Join-Path -Path $configDirectory -ChildPath $existingNode.ConfigurationNames[0]) + '.mof'
+        $filePath = (Join-Path -Path $pullaris.ConfigurationDirectory -ChildPath $existingNode.ConfigurationNames[0]) + '.mof'
         $file = Get-Item -Path $filePath -ErrorAction SilentlyContinue
     
         if ($null -eq $file) {
