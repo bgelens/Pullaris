@@ -1,4 +1,4 @@
-#requires -modules @{ModuleName = 'DSCPullServerAdmin'; ModuleVersion = '0.4.3'}, Polaris
+#requires -modules @{ModuleName = 'DSCPullServerAdmin'; ModuleVersion = '0.4.3'}
 #requires -modules @{ModuleName = 'Polaris'; ModuleVersion = '0.2.0'}
 #requires -version 5.1
 using module DSCPullServerAdmin
